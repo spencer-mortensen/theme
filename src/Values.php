@@ -42,19 +42,30 @@ class Values
 
 	public function set (string $key, string $value): void
 	{
-		$this->variables[$key] = $value;
+		$this->variables[$key] = $this->value($key, $value);
 		$this->evaluated[$key] = false;
+	}
+
+	private function value (string $key, string $value): string
+	{
+		if (!array_key_exists($key, $this->variables)) {
+			return $value;
+		}
+
+		return str_replace('{$' . $key . '}', $this->variables[$key], $value);
 	}
 
 	public function get (string $key): string
 	{
 		if (!array_key_exists($key, $this->variables)) {
-			$keyName = var_export($key, true);
-			throw new Exception("Missing variable: $keyName");
+			return '';
 		}
 
 		if (!$this->evaluated[$key]) {
-			$this->variables[$key] = $this->evaluate($this->variables[$key]);
+			$value = $this->variables[$key];
+			unset($this->variables[$key]);
+
+			$this->variables[$key] = $this->evaluate($value);
 			$this->evaluated[$key] = true;
 		}
 
@@ -64,8 +75,8 @@ class Values
 	private function evaluate (string $input): string
 	{
 		$output = '';
-		$n = strlen($input);
 		$i = 0;
+		$n = strlen($input);
 
 		while (preg_match(self::$reVariable, $input, $match, PREG_OFFSET_CAPTURE, $i) === 1) {
 			$iBegin = $match[0][1];
