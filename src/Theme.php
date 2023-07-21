@@ -86,9 +86,10 @@ class Theme
 			}
 
 			$childPath = "{$path}/{$childName}";
+			$childUrl = "{$url}{$childName}/";
 
 			if (is_dir($childPath)) {
-				$this->addFiles($type, $childPath, $url);
+				$this->addFiles($type, $childPath, $childUrl);
 			}
 		}
 
