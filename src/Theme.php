@@ -80,11 +80,16 @@ class Theme
 		$elements = [];
 
 		foreach ($childNames as $childName) {
-			if (!self::isTail($childName, $tail)) {
+			if (self::isTail($childName, $tail)) {
+				$elements[] = $this->getElementHtml($type, "{$url}{$childName}");
 				continue;
 			}
 
-			$elements[] = $this->getElementHtml($type, "{$url}{$childName}");
+			$childPath = "{$path}/{$childName}";
+
+			if (is_dir($childPath)) {
+				$this->addFiles($type, $childPath, $url);
+			}
 		}
 
 		if (0 < count($elements)) {
