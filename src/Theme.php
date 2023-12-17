@@ -32,30 +32,28 @@ class Theme
 		'js' => '<script src="{$url}" defer></script>'
 	];
 
-	private $values;
 	private $sitePath;
 	private $siteUrl;
 
-	public function __construct (Values $values, string $sitePath, string $siteUrl)
+	public function __construct (string $sitePath, string $siteUrl)
 	{
-		$this->values = $values;
 		$this->sitePath = $sitePath;
 		$this->siteUrl = $siteUrl;
 	}
 
-	public function apply (string $key): void
+	public function apply (string $key, Values $values): void
 	{
 		$path = "{$this->sitePath}/{$key}";
 		$url = "{$this->siteUrl}{$key}/";
 
 		$childNames = self::readDirectory($path);
 
-		$this->addDirectory('css', $childNames, $path, $url);
-		$this->addDirectory('js', $childNames, $path, $url);
-		$this->addValues($childNames, $path);
+		$this->addDirectory('css', $childNames, $path, $url, $values);
+		$this->addDirectory('js', $childNames, $path, $url, $values);
+		$this->addValues($childNames, $path, $values);
 	}
 
-	private function addDirectory (string $type, array &$childNames, string $path, string $url): void
+	private function addDirectory (string $type, array &$childNames, string $path, string $url, Values $values): void
 	{
 		if (!isset($childNames[$type])) {
 			return;
@@ -68,11 +66,11 @@ class Theme
 		}
 
 		$childUrl = "{$url}{$type}/";
-		$this->addFiles($type, $childPath, $childUrl);
+		$this->addFiles($type, $childPath, $childUrl, $values);
 		unset($childNames[$type]);
 	}
 
-	private function addFiles (string $type, string $path, string $url): void
+	private function addFiles (string $type, string $path, string $url, Values $values): void
 	{
 		$childNames = self::readDirectory($path);
 
@@ -89,12 +87,12 @@ class Theme
 			$childUrl = "{$url}{$childName}/";
 
 			if (is_dir($childPath)) {
-				$this->addFiles($type, $childPath, $childUrl);
+				$this->addFiles($type, $childPath, $childUrl, $values);
 			}
 		}
 
 		if (0 < count($elements)) {
-			$this->values->set($type, '{$' . $type . '}' . implode("\n", $elements) . "\n");
+			$values->set($type, '{$' . $type . '}' . implode("\n", $elements) . "\n");
 		}
 	}
 
@@ -105,7 +103,7 @@ class Theme
 		return str_replace('{$url}', $urlHtml, self::$elements[$type]);
 	}
 
-	private function addValues (array $childNames, string $path): void
+	private function addValues (array $childNames, string $path, Values $values): void
 	{
 		$head = '.';
 
@@ -122,7 +120,7 @@ class Theme
 
 			$key = substr($childName, strlen($head));
 			$value = file_get_contents($childPath);
-			$this->values->set($key, $value);
+			$values->set($key, $value);
 		}
 	}
 
