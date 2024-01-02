@@ -49,8 +49,52 @@ class Theme
 		$childNames = self::readDirectory($path);
 
 		$this->addDirectory('css', $childNames, $path, $url, $values);
-		$this->addDirectory('js', $childNames, $path, $url, $values);
+		$this->addJs($childNames, $key, $url, $values);
 		$this->addValues($childNames, $path, $values);
+	}
+
+	private function addJs (array &$childNames, string $directoryKey, string $url, Values $values): void
+	{
+		$jsName = '.js';
+
+		if (!isset($childNames[$jsName])) {
+			return;
+		}
+
+		$childPath = "{$this->sitePath}/{$directoryKey}/{$jsName}";
+
+		if (!is_file($childPath)) {
+			return;
+		}
+
+		$settingsFileText = file_get_contents($childPath);
+		$relativeKeys = explode("\n", trim($settingsFileText));
+		$absoluteKeys = $this->getAbsoluteKeys($directoryKey, $relativeKeys);
+
+		foreach ($absoluteKeys as $key) {
+			$childUrl = "{$this->siteUrl}{$key}";
+
+			if (substr($key, -1) === '/') {
+				$childPath = "{$this->sitePath}/{$key}";
+				$this->addFiles('js', $childPath, $childUrl, $values);
+			} else {
+				$childHtml = $this->getElementHtml('js', $childUrl);
+				$values->set('js', '{$js}' . "{$childHtml}\n");
+			}
+		}
+
+		unset($childNames[$jsName]);
+	}
+
+	private function getAbsoluteKeys (string $directoryKey, array $relativeKeys): array
+	{
+		$absoluteKeys = [];
+
+		foreach ($relativeKeys as $relativeKey) {
+			$absoluteKeys[] = Path::safe("{$directoryKey}/{$relativeKey}");
+		}
+
+		return $absoluteKeys;
 	}
 
 	private function addDirectory (string $type, array &$childNames, string $path, string $url, Values $values): void

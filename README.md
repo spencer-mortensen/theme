@@ -6,13 +6,13 @@ This project is available as a Composer package:
 ## Usage:
 
 ```
+$theme = new Theme($sitePath, $siteUrl);
+
 $values = new Values();
 $values->set('canonicalUrl', $canonicalUrl);
 
-$theme = new Theme($values, $sitePath, $siteUrl);
-
-$theme->apply('theme/page');
-$theme->apply('theme/site');
+$theme->apply('theme/page', $values);
+$theme->apply('theme/site', $values);
 
 echo $values->get('html');
 ```
