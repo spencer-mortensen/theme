@@ -6,7 +6,7 @@
  * This file is part of Theme.
  *
  * Theme is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Lesser General Public License as publi>
+ * it under the terms of the GNU Lesser General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
  * (at your option) any later version.
  *
@@ -15,7 +15,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU Lesser General Public License for more details.
  *
- * You should have received a copy of the GNU Lesser General Public Lic>
+ * You should have received a copy of the GNU Lesser General Public License
  * along with Theme. If not, see <http://www.gnu.org/licenses/>.
  *
  * @author Spencer Mortensen <spencer@lens.guide>
@@ -25,31 +25,24 @@
 
 namespace SpencerMortensen\Theme;
 
-class Path
+class Directory
 {
-	public static function safe (string $input): string
+	public static function read (string $path): array
 	{
-		$inputAtoms = explode('/', $input);
-		$outputAtoms = [];
+		$childNames = [];
 
-		foreach ($inputAtoms as $atom) {
-			if ($atom === '..') {
-				array_pop($outputAtoms);
-			} elseif ((0 < strlen($atom)) && ($atom !== '.')) {
-				$outputAtoms[] = $atom;
+		$directory = opendir($path);
+
+		for ($childName = readdir($directory); $childName !== false; $childName = readdir($directory)) {
+			if (($childName === '.') || ($childName === '..')) {
+				continue;
 			}
+
+			$childNames[$childName] = $childName;
 		}
 
-		$output = implode('/', $outputAtoms);
+		closedir($directory);
 
-		if (substr($input, 0, 1) === '/') {
-			$output = '/' . $output;
-		}
-
-		if ((substr($input, -1) === '/') && (substr($output, -1) !== '/')) {
-			$output .= '/';
-		}
-
-		return $output;
+		return $childNames;
 	}
 }

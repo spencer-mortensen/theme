@@ -34,125 +34,55 @@ class Theme
 
 	private $sitePath;
 	private $siteUrl;
+	private $values;
+	private $css;
+	private $js;
 
 	public function __construct (string $sitePath, string $siteUrl)
 	{
 		$this->sitePath = $sitePath;
 		$this->siteUrl = $siteUrl;
+		$this->values = new Values();
+		$this->css = [];
+		$this->js = [];
 	}
 
-	public function apply (string $key, Values $values): void
+	public function apply (string $key): void
 	{
 		$path = "{$this->sitePath}/{$key}";
-		$url = "{$this->siteUrl}{$key}/";
+		$childNames = Directory::read($path);
 
-		$childNames = self::readDirectory($path);
-
-		$this->addDirectory('css', $childNames, $path, $url, $values);
-		$this->addJs($childNames, $key, $url, $values);
-		$this->addValues($childNames, $path, $values);
+		$this->addDependencies($path, $childNames, '.css', $this->css);
+		$this->addDependencies($path, $childNames, '.js', $this->js);
+		$this->addKeys($path, $childNames);
 	}
 
-	private function addJs (array &$childNames, string $directoryKey, string $url, Values $values): void
+	private function addDependencies (string $directoryPath, array &$childNames, string $extension, array &$dependencies): void
 	{
-		$jsName = '.js';
-
-		if (!isset($childNames[$jsName])) {
+		if (!isset($childNames[$extension])) {
 			return;
 		}
 
-		$childPath = "{$this->sitePath}/{$directoryKey}/{$jsName}";
+		unset($childNames[$extension]);
 
-		if (!is_file($childPath)) {
+		$filePath = "{$directoryPath}/{$extension}";
+
+		if (!is_file($filePath)) {
 			return;
 		}
 
-		$settingsFileText = file_get_contents($childPath);
-		$relativeKeys = explode("\n", trim($settingsFileText));
-		$absoluteKeys = $this->getAbsoluteKeys($directoryKey, $relativeKeys);
+		$contents = file_get_contents($filePath);
+		$dependencyPaths = explode("\n", trim($contents));
 
-		foreach ($absoluteKeys as $key) {
-			$childUrl = "{$this->siteUrl}{$key}";
-
-			if (substr($key, -1) === '/') {
-				$childPath = "{$this->sitePath}/{$key}";
-				$this->addFiles('js', $childPath, $childUrl, $values);
-			} else {
-				$childHtml = $this->getElementHtml('js', $childUrl);
-				$values->set('js', '{$js}' . "{$childHtml}\n");
-			}
+		foreach ($dependencyPaths as $dependencyPath) {
+			$dependencies[$dependencyPath] = true;
 		}
-
-		unset($childNames[$jsName]);
 	}
 
-	private function getAbsoluteKeys (string $directoryKey, array $relativeKeys): array
+	private function addKeys (string $path, array &$childNames): void
 	{
-		$absoluteKeys = [];
-
-		foreach ($relativeKeys as $relativeKey) {
-			$absoluteKeys[] = Path::safe("{$directoryKey}/{$relativeKey}");
-		}
-
-		return $absoluteKeys;
-	}
-
-	private function addDirectory (string $type, array &$childNames, string $path, string $url, Values $values): void
-	{
-		if (!isset($childNames[$type])) {
-			return;
-		}
-
-		$childPath = "{$path}/{$type}";
-
-		if (!is_dir($childPath)) {
-			return;
-		}
-
-		$childUrl = "{$url}{$type}/";
-		$this->addFiles($type, $childPath, $childUrl, $values);
-		unset($childNames[$type]);
-	}
-
-	private function addFiles (string $type, string $path, string $url, Values $values): void
-	{
-		$childNames = self::readDirectory($path);
-
-		$tail = ".{$type}";
-		$elements = [];
-
 		foreach ($childNames as $childName) {
-			if (self::isTail($childName, $tail)) {
-				$elements[] = $this->getElementHtml($type, "{$url}{$childName}");
-				continue;
-			}
-
-			$childPath = "{$path}/{$childName}";
-			$childUrl = "{$url}{$childName}/";
-
-			if (is_dir($childPath)) {
-				$this->addFiles($type, $childPath, $childUrl, $values);
-			}
-		}
-
-		if (0 < count($elements)) {
-			$values->set($type, '{$' . $type . '}' . implode("\n", $elements) . "\n");
-		}
-	}
-
-	private function getElementHtml (string $type, string $url): string
-	{
-		$urlHtml = htmlspecialchars($url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-
-		return str_replace('{$url}', $urlHtml, self::$elements[$type]);
-	}
-
-	private function addValues (array $childNames, string $path, Values $values): void
-	{
-		$head = '.';
-
-		foreach ($childNames as $childName) {
-			if (!self::isHead($childName, $head)) {
+			if (!Text::startsWith($childName, '.')) {
 				continue;
 			}
 
@@ -162,39 +92,82 @@ class Theme
 				continue;
 			}
 
-			$key = substr($childName, strlen($head));
+			$key = substr($childName, 1);
 			$value = file_get_contents($childPath);
-			$values->set($key, $value);
+			$this->values->set($key, $value);
 		}
 	}
 
-	private static function readDirectory (string $path): array
+	public function set (string $key, string $value): void
 	{
-		$childNames = [];
+		$this->values->set($key, $value);
+	}
 
-		$directory = opendir($path);
+	public function get (string $key): string
+	{
+		$this->finalizeType('css', $this->css);
+		$this->finalizeType('js', $this->js);
 
-		for ($childName = readdir($directory); $childName !== false; $childName = readdir($directory)) {
-			if (($childName !== '.') && ($childName !== '..')) {
-				$childNames[$childName] = $childName;
+		return $this->values->get($key);
+	}
+
+	private function finalizeType (string $type, array $dependencies): void
+	{
+		$files = $this->getFiles($dependencies, ".{$type}");
+		$html = $this->getDependenciesHtml($type, $files);
+		$this->values->set($type, $html);
+	}
+
+	private function getFiles (array $dependencies, string $extension): array
+	{
+		$files = [];
+
+		foreach ($dependencies as $key => $true) {
+			$path = "{$this->sitePath}/{$key}";
+
+			if (is_file($path)) {
+				$files[$key] = true;
+			} elseif (is_dir($path)) {
+				$this->getDirectoryFiles($path, $key, '.js', $files);
 			}
 		}
 
-		closedir($directory);
-
-		return $childNames;
+		return $files;
 	}
 
-	private static function isHead (string $haystack, string $needle): bool
+	private function getDirectoryFiles (string $path, string $key, string $extension, array &$files): void
 	{
-		return strncmp($haystack, $needle, strlen($needle)) === 0;
+		$childNames = Directory::read($path);
+
+		foreach ($childNames as $childName) {
+			$childPath = "{$path}/{$childName}";
+			$childKey = "{$key}/{$childName}";
+
+			if (is_file($childPath)) {
+				if (Text::endsWith($childName, $extension)) {
+					$files[$childKey] = true;
+				}
+			} elseif (is_dir($childPath)) {
+				$this->getDirectoryFiles($childPath, $childKey, $extension, $files);
+			}
+		}
 	}
 
-	private static function isTail (string $haystack, string $needle): bool
+	private function getDependenciesHtml (string $type, array $files): string
 	{
-		$length = strlen($needle);
+		$elements = [];
 
-		return ($length < strlen($haystack))
-			&& (substr_compare($haystack, $needle, -$length) === 0);
+		foreach ($files as $key => $true) {
+			$elements[] = self::getElementHtml($type, "{$this->siteUrl}{$key}");
+		}
+
+		return implode("\n", $elements);
+	}
+
+	private static function getElementHtml (string $type, string $url): string
+	{
+		$urlHtml = htmlspecialchars($url, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+		return str_replace('{$url}', $urlHtml, self::$elements[$type]);
 	}
 }

@@ -15,4 +15,20 @@ $theme->apply('theme/page', $values);
 $theme->apply('theme/site', $values);
 
 echo $values->get('html');
+
+
+=== theme/site/.html ===
+<html>
+<head>
+{$css}{$js}<title>{$title}</title>
+</head>
+<body></body>
+</html>
+
+=== theme/site/.title ===
+Masterlined
+
+=== theme/site/.js ===
+script.js
+js/
 ```
