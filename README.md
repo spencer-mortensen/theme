@@ -7,14 +7,12 @@ This project is available as a Composer package:
 
 ```
 $theme = new Theme($sitePath, $siteUrl);
+$theme->set('canonicalUrl', $canonicalUrl);
+$theme->apply('theme/page');
+$theme->apply('theme/site');
+$html = $theme->get('html');
 
-$values = new Values();
-$values->set('canonicalUrl', $canonicalUrl);
-
-$theme->apply('theme/page', $values);
-$theme->apply('theme/site', $values);
-
-echo $values->get('html');
+echo $html;
 
 
 === theme/site/.html ===

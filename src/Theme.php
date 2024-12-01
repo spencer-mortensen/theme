@@ -128,7 +128,7 @@ class Theme
 			if (is_file($path)) {
 				$files[$key] = true;
 			} elseif (is_dir($path)) {
-				$this->getDirectoryFiles($path, $key, '.js', $files);
+				$this->getDirectoryFiles($path, $key, $extension, $files);
 			}
 		}
 
