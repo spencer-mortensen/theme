@@ -8,8 +8,8 @@ This project is available as a Composer package:
 ```
 $theme = new Theme($sitePath, $siteUrl);
 $theme->set('canonicalUrl', $canonicalUrl);
-$theme->apply('theme/page');
 $theme->apply('theme/site');
+$theme->apply('theme/page');
 $html = $theme->get('html');
 
 echo $html;

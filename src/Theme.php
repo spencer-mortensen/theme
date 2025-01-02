@@ -47,46 +47,80 @@ class Theme
 		$this->js = [];
 	}
 
-	public function apply (string $key): void
+	public function apply (string $directoryKey): void
 	{
-		$path = "{$this->sitePath}/{$key}";
-		$childNames = Directory::read($path);
+		$childNames = Directory::read("{$this->sitePath}/{$directoryKey}");
 
-		$this->addDependencies($path, $childNames, '.css', $this->css);
-		$this->addDependencies($path, $childNames, '.js', $this->js);
-		$this->addKeys($path, $childNames);
+		$this->addDependencyKey($directoryKey, $childNames, 'css', $this->css);
+		$this->addDependencyKey($directoryKey, $childNames, 'js', $this->js);
+		$this->addKeys($directoryKey, $childNames);
 	}
 
-	private function addDependencies (string $directoryPath, array &$childNames, string $extension, array &$dependencies): void
+	private function addDependencyKey (string $directoryKey, array &$childNames, string $type, array &$dependencies): void
 	{
-		if (!isset($childNames[$extension])) {
-			return;
-		}
+		$extension = ".{$type}";
 
-		unset($childNames[$extension]);
+		if (isset($childNames[$extension])) {
+			unset($childNames[$extension]);
 
-		$filePath = "{$directoryPath}/{$extension}";
-
-		if (!is_file($filePath)) {
-			return;
-		}
-
-		$contents = file_get_contents($filePath);
-		$dependencyPaths = explode("\n", trim($contents));
-
-		foreach ($dependencyPaths as $dependencyPath) {
-			$dependencies[$dependencyPath] = true;
+			$this->addDependencyList("{$directoryKey}/{$extension}", $type, $dependencies);
 		}
 	}
 
-	private function addKeys (string $path, array &$childNames): void
+	private function addDependencyList (string $fileKey, string $type, array &$dependencies): void
+	{
+		$dependencies[$fileKey] = false;
+		$extension = ".{$type}";
+		$minExtension = ".min{$type}";
+
+		$contents = file_get_contents("{$this->sitePath}/{$fileKey}");
+		$childKeys = explode("\n", trim($contents));
+
+		foreach ($childKeys as $childKey) {
+			$childKey = trim($childKey, '/');
+
+			if (array_key_exists($childKey, $dependencies)) {
+				continue;
+			}
+
+			if (Text::endsWith($childKey, $extension)) {
+				$dependencies[$childKey] = true;
+			} elseif (Text::endsWith($childKey, $minExtension)) {
+				$this->addDependencyList($childKey, $type, $dependencies);
+			} else {
+				$this->addDependencyDirectory($childKey, $extension, $dependencies);
+			}
+		}
+	}
+
+	private function addDependencyDirectory (string $key, string $extension, array &$dependencies): void
+	{
+		$dependencies[$key] = false;
+		$childNames = Directory::read("{$this->sitePath}/{$key}");
+
+		foreach ($childNames as $childName) {
+			$childKey = "{$key}/{$childName}";
+
+			if (array_key_exists($childKey, $dependencies)) {
+				continue;
+			}
+
+			if (Text::endsWith($childKey, $extension)) {
+				$dependencies[$childKey] = true;
+			} elseif (is_dir("{$this->sitePath}/{$childKey}")) {
+				$this->addDependencyDirectory($childKey, $extension, $dependencies);
+			}
+		}
+	}
+
+	private function addKeys (string $directoryKey, array &$childNames): void
 	{
 		foreach ($childNames as $childName) {
 			if (!Text::startsWith($childName, '.')) {
 				continue;
 			}
 
-			$childPath = "{$path}/{$childName}";
+			$childPath = "{$this->sitePath}/{$directoryKey}/{$childName}";
 
 			if (!is_file($childPath)) {
 				continue;
@@ -105,63 +139,24 @@ class Theme
 
 	public function get (string $key): string
 	{
-		$this->finalizeType('css', $this->css);
-		$this->finalizeType('js', $this->js);
+		$this->finalize('css', $this->css);
+		$this->finalize('js', $this->js);
 
 		return $this->values->get($key);
 	}
 
-	private function finalizeType (string $type, array $dependencies): void
-	{
-		$files = $this->getFiles($dependencies, ".{$type}");
-		$html = $this->getDependenciesHtml($type, $files);
-		$this->values->set($type, $html);
-	}
-
-	private function getFiles (array $dependencies, string $extension): array
-	{
-		$files = [];
-
-		foreach ($dependencies as $key => $true) {
-			$path = "{$this->sitePath}/{$key}";
-
-			if (is_file($path)) {
-				$files[$key] = true;
-			} elseif (is_dir($path)) {
-				$this->getDirectoryFiles($path, $key, $extension, $files);
-			}
-		}
-
-		return $files;
-	}
-
-	private function getDirectoryFiles (string $path, string $key, string $extension, array &$files): void
-	{
-		$childNames = Directory::read($path);
-
-		foreach ($childNames as $childName) {
-			$childPath = "{$path}/{$childName}";
-			$childKey = "{$key}/{$childName}";
-
-			if (is_file($childPath)) {
-				if (Text::endsWith($childName, $extension)) {
-					$files[$childKey] = true;
-				}
-			} elseif (is_dir($childPath)) {
-				$this->getDirectoryFiles($childPath, $childKey, $extension, $files);
-			}
-		}
-	}
-
-	private function getDependenciesHtml (string $type, array $files): string
+	private function finalize (string $type, array $dependencies): void
 	{
 		$elements = [];
 
-		foreach ($files as $key => $true) {
-			$elements[] = self::getElementHtml($type, "{$this->siteUrl}{$key}");
+		foreach ($dependencies as $key => $isFile) {
+			if ($isFile) {
+				$elements[] = self::getElementHtml($type, "{$this->siteUrl}{$key}");
+			}
 		}
 
-		return implode("\n", $elements);
+		$html = implode("\n", $elements);
+		$this->values->set($type, $html);
 	}
 
 	private static function getElementHtml (string $type, string $url): string
