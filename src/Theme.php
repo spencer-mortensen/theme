@@ -71,7 +71,6 @@ class Theme
 	{
 		$dependencies[$fileKey] = false;
 		$extension = ".{$type}";
-		$minExtension = ".min{$type}";
 
 		$contents = file_get_contents("{$this->sitePath}/{$fileKey}");
 		$childKeys = explode("\n", trim($contents));
@@ -85,7 +84,7 @@ class Theme
 
 			if (Text::endsWith($childKey, $extension)) {
 				$dependencies[$childKey] = true;
-			} elseif (Text::endsWith($childKey, $minExtension)) {
+			} elseif (Text::endsWith($childKey, '.list')) {
 				$this->addDependencyList($childKey, $type, $dependencies);
 			} else {
 				$this->addDependencyDirectory($childKey, $extension, $dependencies);
@@ -155,7 +154,7 @@ class Theme
 			}
 		}
 
-		$html = implode("\n", $elements);
+		$html = implode("\n", $elements) . "\n";
 		$this->values->set($type, $html);
 	}
 

@@ -27,6 +27,9 @@ echo $html;
 Masterlined
 
 === theme/site/.js ===
-script.js
-js/
+theme/site/script.js.list
+
+=== theme/site/script.js.list ===
+theme/site/js/
+theme/site/script.js
 ```
